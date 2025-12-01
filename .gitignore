@@ -1,0 +1,22 @@
+# Arquivos de ambiente com credenciais
+.env
+openai.env
+
+# Diretórios e arquivos criados por Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv
+venv/
+env/
+/site/
+
+# Logs e arquivos de dados
+*.log
+
+# Arquivos temporários do sistema
+# (Se o bot for rodar no Linux/macOS, o tempfile pode criar arquivos .ogg
+# que, embora sejam excluídos, é bom garantir)
+*.ogg
+*.tmp
