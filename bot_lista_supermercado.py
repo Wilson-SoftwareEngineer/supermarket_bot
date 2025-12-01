@@ -6,6 +6,7 @@ import re
 import tempfile
 from dataclasses import dataclass, field
 from typing import Dict, Optional
+from functools import wraps
 
 from dotenv import load_dotenv
 
@@ -40,7 +41,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ... load_dotenv()
+# ... logging.basicConfig(...)
 
+# =============== SEGURANÇA (LISTA BRANCA) ===============
+# Pega os IDs do .env, separa por vírgula e converte para números inteiros
+try:
+    ALLOWED_USERS = [int(i) for i in os.getenv("ALLOWED_USERS", "").split(",") if i.strip()]
+except ValueError:
+    logger.error("Erro ao ler ALLOWED_USERS do .env. Verifique se são apenas números separados por vírgula.")
+    ALLOWED_USERS = []
+
+def restricted(func):
+    """
+    Decorator: Só permite a execução da função se o usuário estiver na lista ALLOWED_USERS.
+    """
+    @wraps(func)
+    async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        user_id = update.effective_user.id
+        if user_id not in ALLOWED_USERS:
+            logger.warning(f"Acesso negado para usuário não autorizado: {user_id}")
+            # Opcional: Avisar o intruso (ou não fazer nada para ele achar que o bot está quebrado)
+            await update.message.reply_text("⛔ Acesso negado. Este bot é privado.")
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapped
 # =============== MODELO DE DADOS ===============
 
 @dataclass
@@ -329,7 +354,7 @@ async def processar_texto_natural(update: Update, context: ContextTypes.DEFAULT_
 
 
 # =============== HANDLERS PADRÃO ===============
-
+@restricted
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     get_user_state(context)
     await update.message.reply_text(
@@ -339,6 +364,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=REPLY_KEYBOARD_NORMAL,
     )
 
+@restricted
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     kb = REPLY_KEYBOARD_COMPRAS if get_user_state(context).modo_compras else REPLY_KEYBOARD_NORMAL
     await update.message.reply_text(
@@ -350,7 +376,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         parse_mode="Markdown",
         reply_markup=kb
     )
-
+@restricted
 async def compras_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     estado = get_user_state(context)
     estado.modo_compras = True
@@ -363,6 +389,7 @@ async def compras_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         reply_markup=REPLY_KEYBOARD_COMPRAS,
     )
 
+@restricted
 async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Handler de voz padronizado
     if not (update.message.voice or update.message.audio):
@@ -384,6 +411,7 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+@restricted
 async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await processar_texto_natural(update, context, update.message.text)
 
